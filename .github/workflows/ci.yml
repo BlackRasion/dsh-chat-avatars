@@ -1,0 +1,29 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # 零依赖：跳过 npm install，直接跑构建一致性与测试。
+      - name: Check
+        run: npm run check
+
+      # 防回归：发布文件清单必须只含运行时 + 公开根文件（不含 docs/src/test）。
+      - name: Package dry-run
+        run: npm pack --dry-run

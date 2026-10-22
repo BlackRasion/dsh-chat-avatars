@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+*.svg text
+*.json text
+*.yml text
+*.mjs text
+*.js text
+
+# 生成物：GitHub 语言统计不把它当手写源码
+client.js linguist-generated=true

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Chat Avatars",
+    "description": "Shows a configurable avatar beside user and assistant messages, with global defaults and per-workspace overrides."
+  }
+}

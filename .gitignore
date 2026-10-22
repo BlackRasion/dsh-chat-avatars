@@ -1,0 +1,24 @@
+# 依赖与构建产物
+
+node_modules/
+*.tgz
+coverage/
+
+# 本机/编辑器（验收素材与证据不入库）
+.DS_Store
+.idea/
+.vscode/
+*.log
+.tmp/
+.secrets
+test/image/
+
+# 本地开发文档（不随公开仓库发布）
+dev-docs/
+AGENTS.md
+
+# 本地 npm 凭据（不要提交）
+.npmrc
+
+# 注意：根目录 client.js 是由 src/ 拼接生成的发布物，**需要提交**（link 安装直接使用），
+# 不要加入忽略列表；由 scripts/build.mjs 生成并在 CI 中校验一致性。

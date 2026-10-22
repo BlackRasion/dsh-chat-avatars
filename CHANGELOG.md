@@ -1,0 +1,37 @@
+# Changelog
+
+本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与语义化版本。
+
+## [0.1.0] - 2026-10-21
+
+首个公开发布。
+
+### 新增
+
+- **聊天头像**：用户消息右侧、AI 消息左侧；全局默认 + 按工作区覆盖；尺寸 24–60px、圆形/圆角、两侧独立显示开关。
+- **上传与裁剪**：PNG/JPEG/WebP（输入 ≤2 MB）；拖拽/缩放/键盘裁剪，预览即最终效果；静态头像输出 256×256。
+- **动图头像**：GIF/APNG/动图 WebP（输入 ≤6 MB）在本地解码、自适应采样 8–96 帧，烘焙为横向雪碧图并用 CSS `steps()` 播放；`prefers-reduced-motion` 下冻结首帧。
+- **会话内交互**：单击头像打开大图预览（预览内可更换头像）；双击触发纯本地「拍一拍」（抖动 + 气泡 + WebAudio 合成音效，900ms 冷却）。
+- **设置页**：Appearance、Global defaults、Workspace overrides、Interaction、数据工具与只读诊断。
+- **数据工具**：导出/导入 JSON、清除全部数据、清理未使用的工作区头像；多标签页同步。
+- **i18n**：内置中文/英文文案，跟随 dsh locale。
+
+### 兼容与安全
+
+- 支持 dsh `>=0.2.1-rc.2 <0.3.0`；在 dsh 0.2.1-rc.2 上完成真机验收。
+- dsh 版本/宿主契约不匹配时自动暂停并回退原生界面，提供暂停横幅与重新检测。
+- 启动安全：factory / apply / 组件 render 异常均安全降级，不阻断 GUI 启动。
+- 零运行时依赖；不修改 dsh 源码、不写 `document.body`、不写会话事件、不联网。
+- 头像与设置仅保存在本机 `localStorage`（`dsh.chat-avatars.v1`），不读取消息正文。
+
+### 安装
+
+- 推荐：从 GitHub Release 下载 `dsh-chat-avatars-0.1.0.tgz`，执行
+  `dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.0.tgz`。
+- npm 包名 `dsh-chat-avatars`（发布流程另行执行）。
+
+### 已知限制
+
+- 窄屏（<520px）下头像按设计隐藏。
+- 动图播放依赖安全上下文与浏览器 `ImageDecoder`；不可用时拒绝动图，静态头像仍可用。
+- 「每回合一次」AI 头像仍是实验项，默认使用「每条 AI 消息」模式。

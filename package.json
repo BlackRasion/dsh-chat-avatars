@@ -1,0 +1,70 @@
+{
+  "name": "dsh-chat-avatars",
+  "version": "0.1.0",
+  "description": "Chat avatars for the DeepSeek Harness Web GUI: per-workspace avatars, a settings page, import/export, version compatibility and safe degradation.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BlackRasion/dsh-chat-avatars.git"
+  },
+  "homepage": "https://github.com/BlackRasion/dsh-chat-avatars#readme",
+  "bugs": {
+    "url": "https://github.com/BlackRasion/dsh-chat-avatars/issues"
+  },
+  "author": "dsh-chat-avatars contributors",
+  "type": "module",
+  "license": "MIT",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/en.json": "./locale/en.json",
+    "./locale/zh.json": "./locale/zh.json",
+    "./icon": "./icon.webp"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/en.json",
+    "locale/zh.json",
+    "icon.webp",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check-build": "node scripts/build.mjs --check",
+    "test": "node --test",
+    "check": "npm run check-build && node --check client.js && node --check index.js && npm test"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "avatars",
+    "web-ui"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

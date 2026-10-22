@@ -1,0 +1,5 @@
+# Bundle patch（加载层）：只插入一个 loader row。
+# 客户端半边由 package.json 的 dsh.client 声明发现；宿主半边保持空 apply()。
+- insert:
+    - id: dsh-chat-avatars
+      name: 'dsh-chat-avatars'
