@@ -232,6 +232,11 @@ const CSS_TEXT = [
   // M7：设置页「互动」输入（宽度受控，不超出卡片右缘）
   '.dsh-av-text { width: 100%; min-width: 0; max-width: 240px; box-sizing: border-box; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-2); color: inherit; font-size: 13px; }',
   '.dsh-av-text:focus-visible { outline: 2px solid var(--dsw-focus-ring-color); outline-offset: 1px; }',
+  // M7-10：随机文案组列表（每行输入 + 删除，下方添加入口）。
+  '.dsh-av-poke-texts { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; max-width: 300px; }',
+  '.dsh-av-poke-text-row { display: flex; align-items: center; gap: 6px; }',
+  '.dsh-av-poke-text-row .dsh-av-text { flex: 1; max-width: none; }',
+  '.dsh-av-btn-mini { padding: 4px 8px; font-size: 12px; }',
   '.dsh-av-actions-inline { display: flex; gap: 8px; margin-top: 4px; }',
   '@media (prefers-reduced-motion: reduce) { .dsh-av-preview-card, .dsh-av-preview-poke-chip { animation: none; } .dsh-av-poke-bubble { animation: none !important; opacity: 1; transform: none; } .dsh-av-poke-burst { display: none; } .dsh-av-poke-sparkle, .dsh-av-preview-poke-sparkle { animation: none; } .dsh-av-preview-avatar.is-animated { animation: none !important; background-position: 0 0; } [data-chat-flow-kind][data-dsh-av-poke]::after, [data-chat-flow-kind][data-dsh-av-poke]::before { animation: none !important; } .dsh-av-preview-avatar.is-poking { animation: none !important; } }'
 ].join('\n');

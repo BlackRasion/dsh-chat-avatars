@@ -329,6 +329,69 @@ function Banner(props) {
   );
 }
 
+function PokeTextList(props) {
+  const texts = Array.isArray(props.texts) ? props.texts : [];
+  const rows = texts.length > 0 ? texts : [''];
+  const updateAt = function (index, value) {
+    if (texts.length === 0) {
+      props.onChange(value ? [value] : []);
+      return;
+    }
+    const next = texts.slice();
+    next[index] = value;
+    props.onChange(next);
+  };
+  return h(
+    'div',
+    { className: 'dsh-av-poke-texts' },
+    rows.map(function (text, index) {
+      return h(
+        'div',
+        { className: 'dsh-av-poke-text-row', key: String(index) },
+        h('input', {
+          type: 'text',
+          className: 'dsh-av-text',
+          maxLength: POKE_TEXT_MAX,
+          value: text,
+          placeholder: props.placeholder,
+          'aria-label': props.label + ' ' + String(index + 1),
+          disabled: props.disabled,
+          onChange: function (event) {
+            updateAt(index, event && event.target ? String(event.target.value || '') : '');
+          },
+          onBlur: props.onBlur
+        }),
+        texts.length > 0
+          ? h('button', {
+              type: 'button',
+              className: 'dsh-av-btn dsh-av-btn-mini',
+              'aria-label': t('poke.removeText'),
+              title: t('poke.removeText'),
+              disabled: props.disabled,
+              onClick: function () {
+                props.onChange(
+                  texts.filter(function (item, itemIndex) {
+                    return itemIndex !== index;
+                  })
+                );
+              }
+            }, '×')
+          : null
+      );
+    }),
+    texts.length > 0 && texts.length < POKE_TEXTS_MAX
+      ? h('button', {
+          type: 'button',
+          className: 'dsh-av-btn dsh-av-btn-mini',
+          disabled: props.disabled,
+          onClick: function () {
+            props.onChange(texts.concat(''));
+          }
+        }, t('poke.addText'))
+      : null
+  );
+}
+
 function SettingsSection(props) {
   const store = React.useMemo(function () {
     return createStore();
@@ -596,7 +659,7 @@ function SettingsSection(props) {
     },
     [messageForResult]
   );
-  const pokeDraftState = React.useState({ userText: '', assistantText: '' });
+  const pokeDraftState = React.useState({ userTexts: [], assistantTexts: [] });
   const pokeDraft = pokeDraftState[0];
   const setPokeDraft = pokeDraftState[1];
   const pokeDraftRef = React.useRef(pokeDraft);
@@ -605,9 +668,12 @@ function SettingsSection(props) {
   const pokeTextPendingRef = React.useRef(null);
   React.useEffect(
     function () {
-      setPokeDraft({ userText: settingsPoke.userText || '', assistantText: settingsPoke.assistantText || '' });
+      setPokeDraft({
+        userTexts: Array.isArray(settingsPoke.userTexts) ? settingsPoke.userTexts.slice() : [],
+        assistantTexts: Array.isArray(settingsPoke.assistantTexts) ? settingsPoke.assistantTexts.slice() : []
+      });
     },
-    [settingsPoke.userText, settingsPoke.assistantText]
+    [settingsPoke.userTexts, settingsPoke.assistantTexts]
   );
   const flushPokeText = React.useCallback(
     function () {
@@ -620,7 +686,15 @@ function SettingsSection(props) {
       const pending = pokeTextPendingRef.current;
       pokeTextPendingRef.current = null;
       if (!pending) return;
-      updatePoke({ userText: pending.userText || '', assistantText: pending.assistantText || '' });
+      const userTexts = Array.isArray(pending.userTexts) ? pending.userTexts : [];
+      const assistantTexts = Array.isArray(pending.assistantTexts) ? pending.assistantTexts : [];
+      // 同步旧单条字段，让 0.1.0 旧版插件仍能读到首条文案。
+      updatePoke({
+        userTexts: userTexts,
+        assistantTexts: assistantTexts,
+        userText: userTexts[0] || '',
+        assistantText: assistantTexts[0] || ''
+      });
     },
     [updatePoke]
   );
@@ -632,10 +706,11 @@ function SettingsSection(props) {
     },
     [flushPokeText]
   );
-  const onPokeTextChange = function (field) {
-    return function (event) {
-      const value = event && event.target ? String(event.target.value || '') : '';
-      const next = Object.assign({}, pokeDraftRef.current, { [field]: value });
+  const onPokeTextsChange = function (side) {
+    return function (nextTexts) {
+      const field = side === 'user' ? 'userTexts' : 'assistantTexts';
+      const list = Array.isArray(nextTexts) ? nextTexts.slice(0, POKE_TEXTS_MAX) : [];
+      const next = Object.assign({}, pokeDraftRef.current, { [field]: list });
       pokeDraftRef.current = next;
       setPokeDraft(next);
       pokeTextPendingRef.current = next;
@@ -911,29 +986,23 @@ function SettingsSection(props) {
           updatePoke({ enabled: value });
         }
       })),
-      h(Field, { label: t('poke.userText') }, h('input', {
-        type: 'text',
-        className: 'dsh-av-text',
-        maxLength: 40,
-        value: pokeDraft.userText,
+      h(Field, { label: t('poke.textsUser') }, h(PokeTextList, {
+        texts: pokeDraft.userTexts,
+        label: t('poke.textsUser'),
         placeholder: t('poke.defaultUser'),
-        'aria-label': t('poke.userText'),
         disabled: !!(snapshot && snapshot.readonly),
-        onChange: onPokeTextChange('userText'),
+        onChange: onPokeTextsChange('user'),
         onBlur: flushPokeText
       })),
-      h(Field, { label: t('poke.assistantText') }, h('input', {
-        type: 'text',
-        className: 'dsh-av-text',
-        maxLength: 40,
-        value: pokeDraft.assistantText,
+      h(Field, { label: t('poke.textsAssistant') }, h(PokeTextList, {
+        texts: pokeDraft.assistantTexts,
+        label: t('poke.textsAssistant'),
         placeholder: t('poke.defaultAssistant'),
-        'aria-label': t('poke.assistantText'),
         disabled: !!(snapshot && snapshot.readonly),
-        onChange: onPokeTextChange('assistantText'),
+        onChange: onPokeTextsChange('assistant'),
         onBlur: flushPokeText
       })),
-      h('div', { className: 'dsh-av-hint' }, t('poke.textHint')),
+      h('div', { className: 'dsh-av-hint' }, t('poke.textsHint')),
       h(Field, { label: t('poke.sound') }, h(Switch, {
         checked: settingsPoke.sound !== false,
         label: t('poke.sound'),

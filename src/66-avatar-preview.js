@@ -99,7 +99,8 @@ function buildPreviewStyle(info) {
 
 /**
  * 大图预览对话框（原生 dialog showModal，top-layer）。
- * props：info = resolvePreviewInfo(...) 结果、scopeText/pokeText 文案、onClose/onReplace/onPokeSound。
+ * props：info = resolvePreviewInfo(...) 结果、scopeText、pokeTexts（随机文案候选）、
+ *        pokeText（兼容旧调用的单条文案）、onClose/onReplace/onPokeSound。
  */
 function AvatarPreviewDialog(props) {
   const info = props.info;
@@ -108,6 +109,16 @@ function AvatarPreviewDialog(props) {
   const pokeState = React.useState(false);
   const poking = pokeState[0];
   const setPoking = pokeState[1];
+  const pokeTexts = Array.isArray(props.pokeTexts) ? props.pokeTexts : [];
+  const pokeTextState = React.useState(function () {
+    return pickPokeText(pokeTexts, '', Math.random) || props.pokeText || '';
+  });
+  const pokeText = pokeTextState[0];
+  const setPokeText = pokeTextState[1];
+  const pokeIdState = React.useState(0);
+  const pokeId = pokeIdState[0];
+  const setPokeId = pokeIdState[1];
+  const lastPokeTextRef = React.useRef(pokeText);
 
   React.useLayoutEffect(function () {
     const dialog = dialogRef.current;
@@ -146,6 +157,10 @@ function AvatarPreviewDialog(props) {
 
   const onPoke = function () {
     try {
+      const next = pickPokeText(pokeTexts, lastPokeTextRef.current, Math.random) || props.pokeText || '';
+      lastPokeTextRef.current = next;
+      setPokeText(next);
+      setPokeId(pokeId + 1);
       setPoking(true);
       if (pokeTimerRef.current) clearTimeout(pokeTimerRef.current);
       pokeTimerRef.current = setTimeout(function () {
@@ -195,9 +210,9 @@ function AvatarPreviewDialog(props) {
       poking
         ? h(
             'div',
-            { className: 'dsh-av-preview-poke-chip' },
+            { key: 'poke-chip-' + String(pokeId), className: 'dsh-av-preview-poke-chip' },
             h('span', { className: 'dsh-av-preview-poke-sparkle', 'aria-hidden': 'true' }, '✦'),
-            h('span', { className: 'dsh-av-preview-poke-text' }, props.pokeText || '')
+            h('span', { className: 'dsh-av-preview-poke-text' }, pokeText)
           )
         : null,
       h('div', { className: 'dsh-av-preview-name' }, info.label),

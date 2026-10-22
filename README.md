@@ -12,7 +12,7 @@
 overrides, interactive cropping, click-to-change, animated GIF/APNG/WebP avatars (client-side
 sprite sheet + CSS `steps()`), a large preview, and a purely local "poke" effect. Zero runtime
 dependencies; data stays in `localStorage`. Install the GitHub Release tarball with
-`dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.0.tgz`.
+`dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.1.tgz`.
 Requires dsh `>=0.2.1-rc.2 <0.3.0`. MIT licensed.
 
 ## 界面
@@ -35,6 +35,7 @@ Requires dsh `>=0.2.1-rc.2 <0.3.0`. MIT licensed.
 - **动图头像**：GIF/APNG/动图 WebP（≤6 MB）在本地解码、自适应采样 8–96 帧并烘焙为雪碧图，用 CSS `steps()` 播放。
 - **大图预览**：单击聊天中的头像打开居中预览，预览内可直接「更换头像」。
 - **拍一拍**：双击头像触发纯本地效果（行抖动 + 气泡 + WebAudio 合成音效），不写会话事件、不联网、不通知对方。
+- **随机文案组**：用户侧/AI 侧各可配置最多 8 条拍一拍文案，每次双击随机一条且避免连续重复；留空使用内置默认文案。
 - **数据工具**：导出/导入 JSON、清除全部数据、清理未使用的工作区头像；多标签页自动同步。
 - **安全降级**：dsh 版本或宿主契约不匹配时自动暂停并回退原生界面，不阻断 GUI 启动。
 
@@ -42,11 +43,11 @@ Requires dsh `>=0.2.1-rc.2 <0.3.0`. MIT licensed.
 
 ### 方式 1：GitHub Release tarball（当前推荐）
 
-1. 打开 [Releases](https://github.com/BlackRasion/dsh-chat-avatars/releases)，下载最新 `.tgz`（当前为 `dsh-chat-avatars-0.1.0.tgz`）。
+1. 打开 [Releases](https://github.com/BlackRasion/dsh-chat-avatars/releases)，下载最新 `.tgz`（当前为 `dsh-chat-avatars-0.1.1.tgz`）。
 2. 在终端执行（把路径和 profile 换成你的实际值）：
 
    ```bash
-   dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.0.tgz
+   dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.1.tgz
    ```
 
    例如 dsh 的 Web profile 常用 `--profile web`。
@@ -72,10 +73,10 @@ dsh plugin --profile <profile> add dsh-chat-avatars
 4. 在聊天中：
    - **单击**头像 → 大图预览（可在预览内更换头像）；
    - **双击**头像 → 拍一拍（气泡 + 音效）；
-   - 双击后 900ms 内不会重复触发音效。
+   - 连续双击会重新弹出气泡（视觉冷却 300ms）；音效 900ms 内只响一次。
 5. 动图头像支持 GIF/APNG/动图 WebP；上传后会按裁剪区域逐帧生成。开启 `prefers-reduced-motion` 时冻结首帧。
 
-拍一拍的文案、音效开关与音量在设置页 **Interaction** 卡片中配置。
+拍一拍的文案组（可添加多条，每次随机）、音效开关与音量在设置页 **Interaction** 卡片中配置。
 
 ## 兼容性
 
@@ -99,7 +100,7 @@ dsh plugin --profile <profile> add dsh-chat-avatars
 动图需要安全上下文与 `ImageDecoder`；请通过 `http://127.0.0.1` 或 https 打开 GUI。非安全上下文会提示 `E_ANIM_UNSUPPORTED`。
 
 **双击没反应？**
-确认设置页「Interaction」中的拍一拍已开启；两次点击需在同一头像区域且间隔 ≤260ms；900ms 冷却期间不会重复触发。
+确认设置页「Interaction」中的拍一拍已开启；两次点击需在同一头像区域且间隔 ≤260ms；视觉冷却 300ms、音效冷却 900ms。
 
 **卸载重装后设置还在？**
 这是预期行为：数据在 `localStorage`，不属于插件安装目录。可在设置页手动清除。

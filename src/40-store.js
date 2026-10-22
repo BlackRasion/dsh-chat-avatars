@@ -168,6 +168,18 @@ function setStoreSettings(patch) {
       if ('assistantText' in patch.poke) {
         merged.assistantText = typeof sanitizePokeText === 'function' ? sanitizePokeText(patch.poke.assistantText) : '';
       }
+      if ('userTexts' in patch.poke) {
+        merged.userTexts =
+          typeof sanitizePokeTexts === 'function'
+            ? sanitizePokeTexts(patch.poke.userTexts, merged.userText)
+            : Array.isArray(patch.poke.userTexts) ? patch.poke.userTexts.slice(0, 8) : [];
+      }
+      if ('assistantTexts' in patch.poke) {
+        merged.assistantTexts =
+          typeof sanitizePokeTexts === 'function'
+            ? sanitizePokeTexts(patch.poke.assistantTexts, merged.assistantText)
+            : Array.isArray(patch.poke.assistantTexts) ? patch.poke.assistantTexts.slice(0, 8) : [];
+      }
       data.settings.poke = merged;
     }
   });

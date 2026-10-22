@@ -45,7 +45,14 @@ const REQUIRED_KEYS = [
   'animatedTag',
   'crop.animatedHint',
   'busy.upload',
-  'busy.processingAnim'
+  'busy.processingAnim',
+  'poke.textsUser',
+  'poke.textsAssistant',
+  'poke.addText',
+  'poke.removeText',
+  'poke.textsHint',
+  'poke.defaultUser2',
+  'poke.defaultAssistant3'
 ];
 
 test('中英字典 key 完全对齐且无空文案', () => {

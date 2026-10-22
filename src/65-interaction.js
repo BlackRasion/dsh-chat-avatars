@@ -79,6 +79,17 @@ function pseudoElementOf(side) {
 }
 
 /**
+ * 拍一拍内置默认文案变体（随 locale 切换）；自定义文案组为空时随机在其中选择。
+ * 使用独立字符串 key，兼容 i18n 字典“所有值为 string”的约束。
+ */
+function pokeDefaultTexts(side) {
+  if (side === 'assistant') {
+    return [t('poke.defaultAssistant'), t('poke.defaultAssistant2'), t('poke.defaultAssistant3')];
+  }
+  return [t('poke.defaultUser'), t('poke.defaultUser2'), t('poke.defaultUser3')];
+}
+
+/**
  * 会话内交互层：隐藏 file input + hover 命中 + 打开 M2 裁剪对话框。
  * props：sessionId / workspaceId / snapshot（store 快照）/ conversationSnapshot（驱动监听重绑）。
  */
@@ -117,7 +128,10 @@ function AvatarInteraction(props) {
   const poke = pokeState[0];
   const setPoke = pokeState[1];
   const pokeIdRef = React.useRef(0);
-  const lastPokeAtRef = React.useRef(0);
+  // M7-10：视觉/音效冷却分离，随机文案按侧记录上一条用于避免连续重复。
+  const lastPokeVisualAtRef = React.useRef(0);
+  const lastPokeSoundAtRef = React.useRef(0);
+  const lastPokeTextRef = React.useRef({ user: '', assistant: '' });
   const active = !!(
     snapshot &&
     snapshot.data &&
@@ -220,13 +234,15 @@ function AvatarInteraction(props) {
       });
       if (!info) return;
       previewIdRef.current += 1;
+      const side = pendingPreview.side;
       setPreview({
         id: previewIdRef.current,
-        side: pendingPreview.side,
+        side: side,
         info: info,
-        pokeText: resolvePokeText(state.data.settings.poke, pendingPreview.side, {
-          user: t('poke.defaultUser'),
-          assistant: t('poke.defaultAssistant')
+        // 预览内每次「拍一拍」也重新随机（组件内部维护自己的上一条文案）。
+        pokeTexts: resolvePokeTexts(state.data.settings.poke, side, {
+          user: pokeDefaultTexts('user'),
+          assistant: pokeDefaultTexts('assistant')
         })
       });
     } catch (error) {
@@ -250,8 +266,8 @@ function AvatarInteraction(props) {
       const pokeSettings = state.data.settings.poke;
       if (!pokeSettings || pokeSettings.enabled === false) return;
       const now = Date.now();
-      if (pokeCoolingDown(lastPokeAtRef.current, now)) return;
-      lastPokeAtRef.current = now;
+      if (pokeCoolingDown(lastPokeVisualAtRef.current, now, POKE_VISUAL_COOLDOWN_MS)) return;
+      lastPokeVisualAtRef.current = now;
       clearTextSelection();
       clearPreviewTimer();
       const row = hit.row;
@@ -263,18 +279,28 @@ function AvatarInteraction(props) {
           { display: pseudo.display, width: pseudo.width, height: pseudo.height },
           hit.side
         ) || { x: rowRect.left, y: rowRect.top, width: Math.max(1, rowRect.height), height: Math.max(1, rowRect.height) };
+      const candidates = resolvePokeTexts(pokeSettings, hit.side, {
+        user: pokeDefaultTexts('user'),
+        assistant: pokeDefaultTexts('assistant')
+      });
+      const text = pickPokeText(candidates, lastPokeTextRef.current[hit.side], Math.random);
+      lastPokeTextRef.current[hit.side] = text;
       pokeIdRef.current += 1;
       setPoke({
         id: pokeIdRef.current,
         side: hit.side,
-        text: resolvePokeText(pokeSettings, hit.side, {
-          user: t('poke.defaultUser'),
-          assistant: t('poke.defaultAssistant')
-        }),
+        text: text,
         anchor: anchor,
         row: row
       });
-      if (pokeSettings.sound !== false) playPokeSound(resolvePokeVolume(pokeSettings));
+      // 音效单独节流：视觉/抖动/粒子每次触发，音效 900ms 内只响一次。
+      if (
+        pokeSettings.sound !== false &&
+        !pokeCoolingDown(lastPokeSoundAtRef.current, now, POKE_SOUND_COOLDOWN_MS)
+      ) {
+        lastPokeSoundAtRef.current = now;
+        playPokeSound(resolvePokeVolume(pokeSettings));
+      }
     } catch (error) {
       warnWithCode('E_POKE', error);
     }
@@ -564,7 +590,7 @@ function AvatarInteraction(props) {
             : preview.info.scope === 'global'
               ? t('preview.scopeGlobal')
               : t('preview.scopeDefault'),
-        pokeText: preview.pokeText,
+        pokeTexts: preview.pokeTexts,
         onClose: closePreview,
         onReplace: handleReplaceAvatar,
         onPokeSound: function () {

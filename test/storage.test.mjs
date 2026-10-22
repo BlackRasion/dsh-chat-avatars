@@ -37,6 +37,7 @@ function loadStorage(localStorageImpl) {
     ' STATIC_MAX_DATA_URL_CHARS, ANIM_MAX_DATA_URL_CHARS, ANIM_VALUE_FRAME_MIN, ANIM_VALUE_FRAME_MAX,' +
     ' ANIM_FRAME_MS_MIN, ANIM_FRAME_MS_MAX, WARN_STORAGE_BYTES, DATA_URL_RE, DEFAULT_SETTINGS,' +
     ' AI_AVATAR_MODES, MIGRATIONS, defaultData, validDataUrl, validImage, validAvatar, isAnimatedAvatar,' +
+    ' POKE_TEXT_MAX, POKE_TEXTS_MAX, sanitizePokeTexts,' +
     ' normalizeAvatar, sanitizeData, migrateData, loadStoreState, persistStoreData, estimateBytes,' +
     ' countAnimatedAvatars, buildExportPayload, parseImportPayload };';
   const factory = new Function('CONTRACT', 'ERROR_CODES', 'makeError', 'warnWithCode', "'use strict';\n" + BLOCK + '\n' + exportsLine);
@@ -75,7 +76,7 @@ test('默认数据与常量符合 schema v2', () => {
   assert.equal(s.STORAGE_BROKEN_KEY, BROKEN_KEY);
   assert.equal(data.schemaVersion, 2);
   assert.equal(data.pluginVersion, '0.1.0');
-  assert.deepEqual(data.settings, { enabled: true, size: 32, shape: 'circle', showUser: true, showAssistant: true, aiAvatarMode: 'every-step', workspacesCollapsed: true, poke: { enabled: true, sound: true, volume: 60, userText: '', assistantText: '' } });
+  assert.deepEqual(data.settings, { enabled: true, size: 32, shape: 'circle', showUser: true, showAssistant: true, aiAvatarMode: 'every-step', workspacesCollapsed: true, poke: { enabled: true, sound: true, volume: 60, userText: '', assistantText: '', userTexts: [], assistantTexts: [] } });
   assert.deepEqual(data.global, { user: null, assistant: null });
   assert.deepEqual(data.workspaces, {});
   assert.equal(s.STATIC_MAX_DATA_URL_CHARS, 120000);
@@ -185,15 +186,21 @@ test('aiAvatarMode：默认 every-step，仅接受 every-step/first-per-turn', (
   assert.equal(s.sanitizeData({}).data.settings.aiAvatarMode, 'every-step');
 });
 
-test('拍一拍设置：默认值、逐字段回落、文案归一化', () => {
+test('拍一拍设置：默认值、逐字段回落、文案归一化、随机文案组', () => {
   const s = loadStorage(memoryStorage());
-  const defaults = { enabled: true, sound: true, volume: 60, userText: '', assistantText: '' };
+  const defaults = { enabled: true, sound: true, volume: 60, userText: '', assistantText: '', userTexts: [], assistantTexts: [] };
   assert.deepEqual(s.DEFAULT_SETTINGS.poke, defaults);
   assert.deepEqual(s.sanitizeData({}).data.settings.poke, defaults);
+  assert.equal(s.POKE_TEXT_MAX, 40);
+  assert.equal(s.POKE_TEXTS_MAX, 8);
   const custom = s.sanitizeData({
     settings: { poke: { enabled: false, sound: false, volume: 25, userText: '  你好   呀  ', assistantText: 123 } }
   }).data.settings.poke;
-  assert.deepEqual(custom, { enabled: false, sound: false, volume: 25, userText: '你好 呀', assistantText: '' });
+  assert.deepEqual(custom, {
+    enabled: false, sound: false, volume: 25,
+    userText: '你好 呀', assistantText: '',
+    userTexts: ['你好 呀'], assistantTexts: []
+  });
   assert.equal(s.sanitizeData({ settings: { poke: { userText: 'x'.repeat(60) } } }).data.settings.poke.userText.length, 40);
   assert.equal(s.sanitizeData({ settings: { poke: { userText: 'a\u0000b\u001fc' } } }).data.settings.poke.userText, 'a b c');
   const bad = s.sanitizeData({ settings: { poke: { volume: 101, enabled: 0 } } }).data.settings.poke;
@@ -204,6 +211,28 @@ test('拍一拍设置：默认值、逐字段回落、文案归一化', () => {
   assert.equal(legacy.size, 40);
   assert.deepEqual(legacy.poke, defaults);
 });
+
+test('拍一拍随机文案组：trim/去空/去重/上限 8 条/每条 40 字/旧单条映射', () => {
+  const s = loadStorage(memoryStorage());
+  const many = Array.from({ length: 12 }, (_, index) => '  t' + index + '  ');
+  const sanitized = s.sanitizeData({
+    settings: { poke: { userTexts: ['  a  ', 'b', 'a', '', 123, 'x'.repeat(60)], assistantTexts: many } }
+  }).data.settings.poke;
+  assert.deepEqual(sanitized.userTexts, ['a', 'b', 'x'.repeat(40)]);
+  assert.equal(sanitized.assistantTexts.length, 8);
+  assert.equal(sanitized.assistantTexts[0], 't0');
+  assert.deepEqual(sanitizePokeTextsFallback(s), []);
+  // 旧单条字段存在、数组缺失/为空 -> 映射为一条。
+  assert.deepEqual(s.sanitizePokeTexts(undefined, '  旧文案  '), ['旧文案']);
+  assert.deepEqual(s.sanitizePokeTexts([], '旧文案'), ['旧文案']);
+  assert.deepEqual(s.sanitizePokeTexts(['新'], '旧'), ['新']);
+  assert.deepEqual(s.sanitizePokeTexts([], ''), []);
+  // 非数组安全回落旧字段/空。
+  assert.deepEqual(s.sanitizePokeTexts('bad', '旧'), ['旧']);
+});
+function sanitizePokeTextsFallback(s) {
+  return s.sanitizePokeTexts(undefined, '');
+}
 
 test('工作区卡折叠状态：默认折叠，缺省回落默认，显式 false 展开', () => {
   const s = loadStorage(memoryStorage());

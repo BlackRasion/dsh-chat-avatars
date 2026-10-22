@@ -8,8 +8,11 @@
  */
 
 const POKE_CLICK_WINDOW_MS = 260;
-const POKE_COOLDOWN_MS = 900;
-const POKE_BUBBLE_MS = 2200;
+// M7-10：视觉与音效冷却分离——气泡/抖动/粒子最短 300ms，音效 900ms。
+const POKE_VISUAL_COOLDOWN_MS = 300;
+const POKE_SOUND_COOLDOWN_MS = 900;
+// M7-10：气泡显示从 2200ms 缩短到 1800ms；每次拍一拍都会重新挂载并重播 pop/fade。
+const POKE_BUBBLE_MS = 1800;
 const POKE_SHAKE_MS = 520;
 const POKE_BUBBLE_GAP = 10;
 const POKE_BUBBLE_MARGIN = 8;
@@ -30,16 +33,49 @@ function resolvePokeVolume(poke) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-/** 拍一拍文案：自定义优先，空串回落到本地化默认文案。 */
-function resolvePokeText(poke, side, defaults) {
-  if (side !== 'user' && side !== 'assistant') return '';
+/**
+ * 拍一拍候选文案（M7-10）：优先新数组 userTexts/assistantTexts，
+ * 其次旧单条 userText/assistantText（0.1.0 数据兼容），最后回落到调用方传入的本地化默认变体。
+ * 返回去空/去重后的字符串数组（最多 POKE_TEXTS_MAX 条）。
+ */
+function resolvePokeTexts(poke, side, defaults) {
+  if (side !== 'user' && side !== 'assistant') return [];
   const source = poke && typeof poke === 'object' ? poke : {};
-  const raw = side === 'user' ? source.userText : source.assistantText;
-  const custom = typeof sanitizePokeText === 'function' ? sanitizePokeText(raw) : '';
-  if (custom) return custom;
-  const fallback = defaults && typeof defaults === 'object' ? defaults : {};
-  const text = side === 'user' ? fallback.user : fallback.assistant;
-  return typeof text === 'string' ? text : '';
+  const texts = [];
+  const push = function (value) {
+    const text = typeof sanitizePokeText === 'function' ? sanitizePokeText(value) : '';
+    if (!text || texts.indexOf(text) >= 0 || texts.length >= POKE_TEXTS_MAX) return;
+    texts.push(text);
+  };
+  const list = side === 'user' ? source.userTexts : source.assistantTexts;
+  if (Array.isArray(list)) {
+    for (const item of list) push(item);
+  }
+  if (texts.length === 0) push(side === 'user' ? source.userText : source.assistantText);
+  if (texts.length === 0) {
+    const fallback = defaults && typeof defaults === 'object' ? defaults[side] : null;
+    if (Array.isArray(fallback)) {
+      for (const item of fallback) push(item);
+    } else {
+      push(fallback);
+    }
+  }
+  return texts;
+}
+
+/**
+ * 从候选文案中随机选一条（M7-10）：列表 >1 条时排除同侧上一次文案，避免连续重复；
+ * random 可注入（测试用），非法返回值按 0 处理。
+ */
+function pickPokeText(texts, lastText, random) {
+  const list = Array.isArray(texts) ? texts.filter(function (item) { return typeof item === 'string' && item; }) : [];
+  if (!list.length) return '';
+  if (list.length === 1) return list[0];
+  const candidates = lastText ? list.filter(function (item) { return item !== lastText; }) : list;
+  const pool = candidates.length ? candidates : list;
+  const raw = typeof random === 'function' ? Number(random()) : Math.random();
+  const value = isFinite(raw) ? Math.min(0.999999999, Math.max(0, raw)) : 0;
+  return pool[Math.floor(value * pool.length)];
 }
 
 /**
@@ -66,11 +102,14 @@ function nextAvatarClick(state, key, nowMs) {
 }
 
 /** 冷却判断：距上次拍一拍不足 COOLDOWN_MS 时忽略触发。 */
-function pokeCoolingDown(lastPokeAt, nowMs) {
+/** 冷却判断：距上次触发不足 cooldownMs 时返回 true；非法输入一律不冷却。 */
+function pokeCoolingDown(lastPokeAt, nowMs, cooldownMs) {
   const last = Number(lastPokeAt);
   const now = Number(nowMs);
+  const cooldown = Number(cooldownMs);
   if (!isFinite(last) || !isFinite(now) || last <= 0 || now < last) return false;
-  return now - last < POKE_COOLDOWN_MS;
+  if (!isFinite(cooldown) || cooldown <= 0) return false;
+  return now - last < cooldown;
 }
 
 /**
@@ -198,16 +237,21 @@ function disposePokeAudio() {
 function PokeLayer(props) {
   const poke = props.poke || null;
   const bubbleRef = React.useRef(null);
+  // M7-10：定位与 poke.id 绑定；新一次拍一拍不复用上一轮位置，测量完成后才显示。
   const placementState = React.useState(null);
-  const placement = placementState[0];
-  const setPlacement = placementState[1];
+  const placementEntry = placementState[0];
+  const setPlacementEntry = placementState[1];
   const onDoneRef = React.useRef(props.onDone);
   onDoneRef.current = props.onDone;
   const pokeId = poke ? poke.id : null;
+  const placement = poke && placementEntry && placementEntry.id === pokeId ? placementEntry.value : null;
 
   React.useLayoutEffect(
     function () {
-      if (!poke) return;
+      if (!poke) {
+        setPlacementEntry(null);
+        return;
+      }
       try {
         const bubble = bubbleRef.current;
         if (!bubble || typeof bubble.getBoundingClientRect !== 'function') return;
@@ -222,9 +266,10 @@ function PokeLayer(props) {
           { width: typeof window !== 'undefined' ? window.innerWidth : 0, height: typeof window !== 'undefined' ? window.innerHeight : 0 },
           poke.side
         );
-        if (next) setPlacement(next);
+        setPlacementEntry(next ? { id: pokeId, value: next } : null);
       } catch (error) {
         warnWithCode('E_POKE', error);
+        setPlacementEntry(null);
       }
     },
     [pokeId]
@@ -233,7 +278,7 @@ function PokeLayer(props) {
   React.useEffect(
     function () {
       if (!poke) {
-        setPlacement(null);
+        setPlacementEntry(null);
         return undefined;
       }
       let disposed = false;
@@ -301,7 +346,7 @@ function PokeLayer(props) {
     placement
       ? h(
           'div',
-          { className: 'dsh-av-poke-burst' + sideClass, style: burstStyle, 'aria-hidden': 'true' },
+          { key: 'burst-' + String(pokeId), className: 'dsh-av-poke-burst' + sideClass, style: burstStyle, 'aria-hidden': 'true' },
           h('span', { className: 'dsh-av-poke-dot is-1' }),
           h('span', { className: 'dsh-av-poke-dot is-2' }),
           h('span', { className: 'dsh-av-poke-dot is-3' }),
@@ -311,6 +356,7 @@ function PokeLayer(props) {
     h(
       'div',
       {
+        key: 'bubble-' + String(pokeId),
         ref: bubbleRef,
         className: className,
         style: style,

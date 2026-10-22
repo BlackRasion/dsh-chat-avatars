@@ -32,6 +32,8 @@ const DATA_URL_RE = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$
 const EXPORT_FORMAT = 'dsh-chat-avatars';
 // M7：拍一拍文案上限（字符）；超长截断、控制字符替换为空格。
 const POKE_TEXT_MAX = 40;
+// M7-10：每侧随机文案组上限（条）；超出截断。
+const POKE_TEXTS_MAX = 8;
 const DEFAULT_SETTINGS = Object.freeze({
   enabled: true,
   size: 32,
@@ -41,13 +43,16 @@ const DEFAULT_SETTINGS = Object.freeze({
   aiAvatarMode: 'every-step',
   // M7 打磨：工作区覆盖卡默认折叠（UI 偏好，随数据持久化/导出导入/多标签同步）。
   workspacesCollapsed: true,
-  // M7：纯本地拍一拍；文案空串 = 使用 i18n 默认文案（跟随语言）。
+  // M7：纯本地拍一拍；文案空数组 = 使用 i18n 默认变体（跟随语言）。
+  // userTexts/assistantTexts 为 M7-10 新增的随机文案组；userText/assistantText 保留兼容旧数据/旧版插件。
   poke: Object.freeze({
     enabled: true,
     sound: true,
     volume: 60,
     userText: '',
-    assistantText: ''
+    assistantText: '',
+    userTexts: Object.freeze([]),
+    assistantTexts: Object.freeze([])
   })
 });
 
@@ -89,6 +94,28 @@ function sanitizePokeText(value) {
   return cleaned.length > POKE_TEXT_MAX ? cleaned.slice(0, POKE_TEXT_MAX) : cleaned;
 }
 
+/**
+ * 随机文案组归一化：逐条 sanitize、去空、去重、最多 POKE_TEXTS_MAX 条。
+ * 新数组缺失/为空且旧单条文案存在时映射为 [旧文案]（0.1.0 数据兼容）；
+ * 都为空返回 []（运行时回落到 i18n 默认变体）。
+ */
+function sanitizePokeTexts(value, legacy) {
+  const texts = [];
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = sanitizePokeText(item);
+      if (!text || texts.indexOf(text) >= 0) continue;
+      texts.push(text);
+      if (texts.length >= POKE_TEXTS_MAX) break;
+    }
+  }
+  if (texts.length === 0) {
+    const fallback = sanitizePokeText(legacy);
+    if (fallback) texts.push(fallback);
+  }
+  return texts;
+}
+
 function defaultData() {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -106,7 +133,9 @@ function defaultData() {
         sound: DEFAULT_SETTINGS.poke.sound,
         volume: DEFAULT_SETTINGS.poke.volume,
         userText: DEFAULT_SETTINGS.poke.userText,
-        assistantText: DEFAULT_SETTINGS.poke.assistantText
+        assistantText: DEFAULT_SETTINGS.poke.assistantText,
+        userTexts: [],
+        assistantTexts: []
       }
     },
     global: { user: null, assistant: null },
@@ -186,6 +215,9 @@ function sanitizeData(input) {
   data.settings.poke.volume = validPokeVolume(poke.volume) ? poke.volume : DEFAULT_SETTINGS.poke.volume;
   data.settings.poke.userText = sanitizePokeText(poke.userText);
   data.settings.poke.assistantText = sanitizePokeText(poke.assistantText);
+  // M7-10：随机文案组；旧单条文案映射为一条，空数组交给运行时 i18n 默认变体。
+  data.settings.poke.userTexts = sanitizePokeTexts(poke.userTexts, data.settings.poke.userText);
+  data.settings.poke.assistantTexts = sanitizePokeTexts(poke.assistantTexts, data.settings.poke.assistantText);
   const global = source.global && typeof source.global === 'object' ? source.global : {};
   for (const side of SIDES) {
     const value = global[side];
