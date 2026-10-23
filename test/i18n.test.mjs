@@ -130,3 +130,30 @@ test('locale 缺失/抛错时回退英文，不与外部 state 耦合', () => {
   assert.equal(runtimeApi.readLocaleId(), 'en');
   assert.equal(runtimeApi.messageForCode('E_IMPORT_INVALID'), 'This file is not a valid avatar backup.');
 });
+
+test('locale 服务晚到：先英文，服务出现后按需切换中文', () => {
+  let service = null;
+  runtimeApi.bindLocaleService({ get: () => service });
+  assert.equal(runtimeApi.readLocaleId(), 'en');
+  assert.equal(runtimeApi.t('title'), 'Chat avatars');
+  service = { getLocale: () => ({ active: 'zh' }) };
+  assert.equal(runtimeApi.readLocaleId(), 'zh');
+  assert.equal(runtimeApi.t('title'), '聊天头像');
+  assert.equal(runtimeApi.messageForCode('E_IMPORT_INVALID'), '这个文件不是有效的头像备份。');
+});
+
+test('locale 服务缺失时按 html lang / navigator 兜底中文', () => {
+  const previousDocument = globalThis.document;
+  try {
+    globalThis.document = { documentElement: { lang: 'zh-CN' } };
+    runtimeApi.bindLocaleService({ get: () => undefined });
+    assert.equal(runtimeApi.readLocaleId(), 'zh');
+    assert.equal(runtimeApi.t('title'), '聊天头像');
+    globalThis.document = { documentElement: { lang: 'not-a-language' } };
+    runtimeApi.bindLocaleService({ get: () => undefined });
+    assert.equal(runtimeApi.readLocaleId(), 'en');
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});

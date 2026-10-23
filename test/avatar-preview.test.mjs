@@ -98,3 +98,60 @@ test('buildPreviewStyle：静态 cover/圆；动图 auto 100% + steps 动画 + �
   const assistantFallback = api.buildPreviewStyle({ side: 'assistant', image: null, shape: 'circle' });
   assert.equal(assistantFallback.backgroundColor, 'var(--dsw-alias-bg-layer-2, #1f1f24)');
 });
+
+// M7-11 预览主题：桌面端浅色主题需要实色卡片/轻阴影/浅色遮罩。
+const THEME_START = '// @chat-avatars-preview-theme:start';
+const THEME_END = '// @chat-avatars-preview-theme:end';
+const THEME_START_AT = SOURCE.indexOf(THEME_START);
+const THEME_END_AT = SOURCE.indexOf(THEME_END);
+assert.ok(THEME_START_AT >= 0 && THEME_END_AT > THEME_START_AT, 'src/66-avatar-preview.js 缺少预览主题标记');
+const THEME_BLOCK = SOURCE.slice(THEME_START_AT + THEME_START.length, THEME_END_AT);
+const themeApi = new Function(
+  "'use strict';\n" + THEME_BLOCK + '\nreturn { parsePreviewColor, previewLuminance, resolvePreviewTheme };'
+)();
+
+test('parsePreviewColor：hex/rgb/rgba 解析与非法值', () => {
+  assert.deepEqual(themeApi.parsePreviewColor('#fff'), { r: 255, g: 255, b: 255, a: 1 });
+  assert.deepEqual(themeApi.parsePreviewColor('#111827'), { r: 17, g: 24, b: 39, a: 1 });
+  assert.deepEqual(themeApi.parsePreviewColor('rgba(250, 250, 252, .46)'), { r: 250, g: 250, b: 252, a: 0.46 });
+  assert.equal(themeApi.parsePreviewColor('transparent'), null);
+  assert.equal(themeApi.parsePreviewColor('not-a-color'), null);
+  assert.equal(themeApi.parsePreviewColor(undefined), null);
+  assert.ok(Math.abs(themeApi.previewLuminance({ r: 255, g: 255, b: 255 }) - 1) < 1e-9);
+  assert.equal(themeApi.previewLuminance({ r: 0, g: 0, b: 0 }), 0);
+});
+
+test('resolvePreviewTheme：浅色 token、深色 token、背景兜底与 prefers-color-scheme', () => {
+  const previousDocument = globalThis.document;
+  const previousGetComputedStyle = globalThis.getComputedStyle;
+  const previousWindow = globalThis.window;
+  try {
+    const root = {};
+    const body = {};
+    let vars = {};
+    let backgrounds = new Map();
+    globalThis.document = { documentElement: root, body };
+    globalThis.getComputedStyle = (node) => ({
+      getPropertyValue: (name) => vars[name] || '',
+      backgroundColor: backgrounds.get(node) || 'transparent'
+    });
+    vars = { '--dsw-alias-bg-layer-1': '#ffffff' };
+    assert.equal(themeApi.resolvePreviewTheme(), 'light');
+    vars = { '--dsw-alias-bg-layer-2': '#111827' };
+    assert.equal(themeApi.resolvePreviewTheme(), 'dark');
+    vars = {};
+    backgrounds = new Map([[body, 'rgb(255, 255, 255)']]);
+    assert.equal(themeApi.resolvePreviewTheme(), 'light');
+    backgrounds = new Map([[root, 'rgb(17, 24, 39)']]);
+    assert.equal(themeApi.resolvePreviewTheme(), 'dark');
+    backgrounds = new Map();
+    globalThis.window = { matchMedia: () => ({ matches: true }) };
+    assert.equal(themeApi.resolvePreviewTheme(), 'dark');
+    globalThis.window = { matchMedia: () => ({ matches: false }) };
+    assert.equal(themeApi.resolvePreviewTheme(), 'light');
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document; else globalThis.document = previousDocument;
+    if (previousGetComputedStyle === undefined) delete globalThis.getComputedStyle; else globalThis.getComputedStyle = previousGetComputedStyle;
+    if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow;
+  }
+});

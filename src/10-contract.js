@@ -66,5 +66,5 @@ const CONTRACT = Object.freeze({
   minDsh: '0.2.1-rc.2',
   // 宿主注入的 boot graph 全局名；release.version/commit 由 M1-5 读取。
   bootGlobal: '__DSH_BOOT__',
-  build: '0.1.2'
+  build: '0.1.3'
 });

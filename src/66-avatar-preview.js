@@ -97,6 +97,68 @@ function buildPreviewStyle(info) {
 }
 // @chat-avatars-avatar-preview:end
 
+// @chat-avatars-preview-theme:start
+/**
+ * 解析预览主题：优先使用宿主主题 token 的亮度，失败再看根/body 背景，最后回退系统 color-scheme。
+ * 桌面端 top-layer 可能拿不到完整宿主变量；浅色主题下需要明确的实色背景、轻阴影与浅色遮罩。
+ */
+function parsePreviewColor(value) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim().toLowerCase();
+  if (!text || text === 'transparent') return null;
+  const hex = text.match(/^#([0-9a-f]{3,8})$/i);
+  if (hex) {
+    let raw = hex[1];
+    if (raw.length === 3 || raw.length === 4) raw = raw.split('').map(function (c) { return c + c; }).join('');
+    if (raw.length !== 6 && raw.length !== 8) return null;
+    const r = parseInt(raw.slice(0, 2), 16);
+    const g = parseInt(raw.slice(2, 4), 16);
+    const b = parseInt(raw.slice(4, 6), 16);
+    const a = raw.length === 8 ? parseInt(raw.slice(6, 8), 16) / 255 : 1;
+    return { r: r, g: g, b: b, a: a };
+  }
+  const rgb = text.match(/^rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)(?:\s*[,/]\s*([\d.]+)\s*)?\)$/i);
+  if (rgb) {
+    return {
+      r: Math.max(0, Math.min(255, Number(rgb[1]))),
+      g: Math.max(0, Math.min(255, Number(rgb[2]))),
+      b: Math.max(0, Math.min(255, Number(rgb[3]))),
+      a: rgb[4] === undefined ? 1 : Math.max(0, Math.min(1, Number(rgb[4])))
+    };
+  }
+  return null;
+}
+
+function previewLuminance(color) {
+  return (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255;
+}
+
+function resolvePreviewTheme() {
+  try {
+    if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return 'dark';
+    const root = document.documentElement;
+    if (root) {
+      const rootStyle = getComputedStyle(root);
+      const names = ['--dsw-alias-bg-layer-1', '--dsw-alias-bg-layer-2', '--dsw-alias-bg-base'];
+      for (const name of names) {
+        const color = parsePreviewColor(rootStyle.getPropertyValue(name));
+        if (color && color.a > 0.1) return previewLuminance(color) >= 0.5 ? 'light' : 'dark';
+      }
+    }
+    const targets = [document.body, root];
+    for (const target of targets) {
+      if (!target) continue;
+      const background = parsePreviewColor(getComputedStyle(target).backgroundColor);
+      if (background && background.a > 0.1) return previewLuminance(background) >= 0.5 ? 'light' : 'dark';
+    }
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+  } catch (error) {}
+  return 'dark';
+}
+// @chat-avatars-preview-theme:end
+
 /**
  * 大图预览对话框（原生 dialog showModal，top-layer）。
  * props：info = resolvePreviewInfo(...) 结果、scopeText、pokeTexts（随机文案候选）、
@@ -104,6 +166,7 @@ function buildPreviewStyle(info) {
  */
 function AvatarPreviewDialog(props) {
   const info = props.info;
+  const theme = resolvePreviewTheme();
   const dialogRef = React.useRef(null);
   const pokeTimerRef = React.useRef(0);
   const pokeState = React.useState(false);
@@ -180,6 +243,7 @@ function AvatarPreviewDialog(props) {
     {
       ref: dialogRef,
       className: 'dsh-av-preview-dialog',
+      'data-dsh-av-theme': theme,
       'aria-label': t('preview.title'),
       onCancel: function (event) {
         try {

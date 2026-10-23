@@ -245,33 +245,120 @@ const DICT = Object.freeze({
 // @chat-avatars-i18n:end
 
 // @chat-avatars-i18n-runtime:start
+let localeCtx = null;
 let localeService = null;
+let localeRegistrationWanted = false;
+let localeRegisteredService = null;
+let localeDisposers = [];
 
-/** apply 时绑定宿主 locale 服务；缺失/异常时降级为英文。 */
-function bindLocaleService(ctx) {
+/** 延迟解析宿主 locale 服务：桌面端可能晚于插件加载，不能在 init 时只取一次。 */
+function resolveLocaleService() {
+  if (localeService) return localeService;
+  if (!localeCtx || typeof localeCtx.get !== 'function') return null;
   try {
-    localeService = ctx && typeof ctx.get === 'function' ? ctx.get('locale') || null : null;
+    const service = localeCtx.get('locale');
+    if (service) {
+      localeService = service;
+      ensureLocaleDictionaries();
+    }
   } catch (error) {
     localeService = null;
   }
   return localeService;
 }
 
-/** 读取当前 locale id（LocaleSnapshot.active，0.2.1-rc.2 已核实）；未知/缺失回退 en。 */
+/** 服务就绪后补注册中英字典；已注册过同一服务则跳过。 */
+function ensureLocaleDictionaries() {
+  if (!localeRegistrationWanted || !localeService || typeof localeService.register !== 'function') return;
+  if (localeRegisteredService === localeService) return;
+  localeRegisteredService = localeService;
+  localeDisposers = [];
+  for (const id of ['en', 'zh']) {
+    try {
+      const dispose = localeService.register(I18N_NS, id, DICT[id]);
+      if (typeof dispose === 'function') localeDisposers.push(dispose);
+    } catch (error) {}
+  }
+}
+
+/** apply 时绑定 ctx；真正读取时再惰性解析 locale 服务。 */
+function bindLocaleService(ctx) {
+  localeCtx = ctx && typeof ctx.get === 'function' ? ctx : null;
+  localeService = null;
+  return resolveLocaleService();
+}
+
+/** 服务永远不可用时的浏览器语言兜底（html lang 优先，其次 navigator.languages）。 */
+function readBrowserLocaleId() {
+  try {
+    const tags = [];
+    if (typeof document !== 'undefined' && document && document.documentElement) {
+      if (typeof document.documentElement.lang === 'string') tags.push(document.documentElement.lang);
+    }
+    if (typeof navigator !== 'undefined' && navigator) {
+      if (Array.isArray(navigator.languages)) tags.push.apply(tags, navigator.languages);
+      if (typeof navigator.language === 'string') tags.push(navigator.language);
+    }
+    for (const tag of tags) {
+      const id = String(tag).toLowerCase();
+      if (id.indexOf('zh') === 0) return 'zh';
+      if (id.indexOf('en') === 0) return 'en';
+    }
+  } catch (error) {}
+  return 'en';
+}
+
+/** 读取当前 locale id（LocaleSnapshot.active，0.2.1-rc.2 已核实）；服务缺失时回退浏览器语言。 */
 function readLocaleId() {
   try {
-    if (!localeService) return 'en';
-    const snapshot = typeof localeService.getLocale === 'function' ? localeService.getLocale() : null;
-    const id =
-      snapshot && typeof snapshot.active === 'string'
-        ? snapshot.active
-        : snapshot && typeof snapshot.id === 'string'
-          ? snapshot.id
-          : null;
-    return id || 'en';
-  } catch (error) {
-    return 'en';
-  }
+    const service = resolveLocaleService();
+    if (service) {
+      const snapshot = typeof service.getLocale === 'function' ? service.getLocale() : null;
+      const id =
+        snapshot && typeof snapshot.active === 'string'
+          ? snapshot.active
+          : snapshot && typeof snapshot.id === 'string'
+            ? snapshot.id
+            : null;
+      if (id) return id;
+    }
+  } catch (error) {}
+  return readBrowserLocaleId();
+}
+
+/** 订阅 locale 变化；服务晚到时短轮询等待一次订阅机会，卸载时清理。 */
+function subscribeLocaleChanges(callback) {
+  let disposed = false;
+  let disposeSubscription = null;
+  let timer = 0;
+  const attach = function () {
+    if (disposed) return;
+    const service = resolveLocaleService();
+    if (service && typeof service.subscribe === 'function') {
+      try {
+        disposeSubscription = service.subscribe(function () {
+          if (!disposed) callback();
+        });
+      } catch (error) {}
+    }
+    if (!disposeSubscription) timer = setTimeout(attach, 500);
+  };
+  attach();
+  return function () {
+    disposed = true;
+    if (timer) {
+      try {
+        clearTimeout(timer);
+      } catch (error) {}
+      timer = 0;
+    }
+    if (typeof disposeSubscription === 'function') {
+      try {
+        disposeSubscription();
+      } catch (error) {}
+      disposeSubscription = null;
+    }
+  };
 }
 
 function currentLocaleId() {
@@ -307,22 +394,19 @@ function messageForCode(code) {
 }
 // @chat-avatars-i18n-runtime:end
 
-/** 在 apply 的 effect 内调用：向宿主 locale 注册中英字典；返回清理函数。 */
+/** 在 apply 的 effect 内调用：向宿主 locale 注册中英字典；服务晚到时在首次读取时补注册。 */
 function registerLocaleDictionaries() {
-  const disposers = [];
-  const service = localeService;
-  if (!service || typeof service.register !== 'function') {
-    return function () {};
-  }
-  for (const id of ['en', 'zh']) {
-    try {
-      const dispose = service.register(I18N_NS, id, DICT[id]);
-      if (typeof dispose === 'function') disposers.push(dispose);
-    } catch (error) {
-      warnWithCode('E_LOCALE', error);
-    }
+  localeRegistrationWanted = true;
+  try {
+    ensureLocaleDictionaries();
+  } catch (error) {
+    warnWithCode('E_LOCALE', error);
   }
   return function () {
+    localeRegistrationWanted = false;
+    const disposers = localeDisposers;
+    localeDisposers = [];
+    localeRegisteredService = null;
     for (const dispose of disposers) {
       try {
         dispose();
@@ -331,18 +415,15 @@ function registerLocaleDictionaries() {
   };
 }
 
-/** locale 变化时触发重渲染（设置页/桥用它刷新文案）。 */
+/** locale 变化时触发重渲染（设置页/桥用它刷新文案）；服务晚到也能补订阅。 */
 function useLocaleId() {
   const initial = React.useState(readLocaleId);
   const id = initial[0];
   const setId = initial[1];
   React.useEffect(function () {
-    const service = localeService;
-    if (!service || typeof service.subscribe !== 'function') return undefined;
-    const dispose = service.subscribe(function () {
+    return subscribeLocaleChanges(function () {
       setId(readLocaleId());
     });
-    return typeof dispose === 'function' ? dispose : undefined;
   }, []);
   return id;
 }

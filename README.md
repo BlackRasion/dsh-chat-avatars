@@ -12,7 +12,7 @@
 overrides, interactive cropping, click-to-change, animated GIF/APNG/WebP avatars (client-side
 sprite sheet + CSS `steps()`), a large preview, and a purely local "poke" effect. Zero runtime
 dependencies; data stays in `localStorage`. Install the GitHub Release tarball with
-`dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.2.tgz`.
+`dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.3.tgz`.
 Requires dsh `>=0.2.1-rc.2 <0.3.0`. MIT licensed.
 
 ## 界面
@@ -43,11 +43,11 @@ Requires dsh `>=0.2.1-rc.2 <0.3.0`. MIT licensed.
 
 ### 方式 1：GitHub Release tarball（当前推荐）
 
-1. 打开 [Releases](https://github.com/BlackRasion/dsh-chat-avatars/releases)，下载最新 `.tgz`（当前为 `dsh-chat-avatars-0.1.2.tgz`）。
+1. 打开 [Releases](https://github.com/BlackRasion/dsh-chat-avatars/releases)，下载最新 `.tgz`（当前为 `dsh-chat-avatars-0.1.3.tgz`）。
 2. 在终端执行（把路径和 profile 换成你的实际值）：
 
    ```bash
-   dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.2.tgz
+   dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.3.tgz
    ```
 
    例如 dsh 的 Web profile 常用 `--profile web`。
@@ -104,6 +104,9 @@ dsh plugin --profile <profile> add dsh-chat-avatars
 
 **卸载重装后设置还在？**
 这是预期行为：数据在 `localStorage`，不属于插件安装目录。可在设置页手动清除。
+
+**桌面端预览时窗口标题栏仍然很亮？**
+标题栏由桌面壳/Windows 绘制，不在插件页面的 CSS 控制范围内；浅色主题下预览已使用浅色磨砂遮罩降低明暗差，但插件无法直接调暗原生最小化/最大化/关闭按钮区域。
 
 **升级 dsh 后需要做什么？**
 插件会自动检测版本/契约；不匹配时暂停并显示横幅，匹配后「重新检测」即可恢复。继续使用前建议先在真实页面检查头像与设置页。
