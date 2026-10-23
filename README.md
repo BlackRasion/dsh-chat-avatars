@@ -17,15 +17,15 @@ Requires dsh `>=0.2.1-rc.2 <0.3.0`. MIT licensed.
 
 ## 界面
 
-![聊天中的头像](https://raw.githubusercontent.com/BlackRasion/dsh-chat-avatars/main/assets/screenshots/chat.webp)
+![实际界面：用户消息右侧、AI 消息左侧显示头像](https://raw.githubusercontent.com/BlackRasion/dsh-chat-avatars/main/assets/screenshots/%E7%95%8C%E9%9D%A2.png)
 
-| 设置页 | 大图预览 |
+| 设置页 | 大图预览（动图） |
 |:---:|:---:|
-| ![设置页](https://raw.githubusercontent.com/BlackRasion/dsh-chat-avatars/main/assets/screenshots/settings.webp) | ![大图预览](https://raw.githubusercontent.com/BlackRasion/dsh-chat-avatars/main/assets/screenshots/preview.webp) |
+| ![设置页](https://raw.githubusercontent.com/BlackRasion/dsh-chat-avatars/main/assets/screenshots/%E8%AE%BE%E7%BD%AE%E9%A1%B5.png) | ![大图预览（动图）](https://raw.githubusercontent.com/BlackRasion/dsh-chat-avatars/main/assets/screenshots/%E5%A4%A7%E5%9B%BE%E9%A2%84%E8%A7%88.gif) |
 
-![拍一拍](https://raw.githubusercontent.com/BlackRasion/dsh-chat-avatars/main/assets/screenshots/poke.webp)
+![拍一拍（动图）](https://raw.githubusercontent.com/BlackRasion/dsh-chat-avatars/main/assets/screenshots/%E6%8B%8D%E4%B8%80%E6%8B%8D.gif)
 
-> 截图为脱敏示例（示例头像 + 合成消息），不代表真实会话内容。
+> 截图为实际界面演示；示例头像与会话内容仅用于展示。
 
 ## 功能
 

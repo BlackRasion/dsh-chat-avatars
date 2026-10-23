@@ -22,3 +22,6 @@ AGENTS.md
 
 # 注意：根目录 client.js 是由 src/ 拼接生成的发布物，**需要提交**（link 安装直接使用），
 # 不要加入忽略列表；由 scripts/build.mjs 生成并在 CI 中校验一致性。
+
+# Windows 交换文件元数据（从 Windows 复制到 WSL 时产生）
+*:Zone.Identifier
