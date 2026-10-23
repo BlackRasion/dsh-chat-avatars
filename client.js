@@ -5014,6 +5014,22 @@ function orphanWorkspaceIds(workspacesReady, storedIds, validIds) {
 }
 // @chat-avatars-settings-orphans:end
 
+// @chat-avatars-settings-poke-draft:start
+/** 拍一拍文案草稿签名：与 store 落盘后的数组比较，识别“自身保存触发的回写”。 */
+function pokeDraftSignature(userTexts, assistantTexts) {
+  return JSON.stringify([
+    Array.isArray(userTexts) ? userTexts : [],
+    Array.isArray(assistantTexts) ? assistantTexts : []
+  ]);
+}
+
+/** 是否需要从 settings 回写草稿：本地有未保存编辑时不覆盖；签名相同（自身保存）时也不覆盖。 */
+function shouldSyncPokeDraft(pending, incomingSignature, savedSignature) {
+  if (pending) return false;
+  return incomingSignature !== savedSignature;
+}
+// @chat-avatars-settings-poke-draft:end
+
 function Button(props) {
   return h(
     'button',
@@ -5607,6 +5623,7 @@ function SettingsSection(props) {
       const base = settingsPokeRef.current && typeof settingsPokeRef.current === 'object' ? settingsPokeRef.current : {};
       const result = store.setSettings({ poke: Object.assign({}, base, patch) });
       messageForResult(result);
+      return result;
     },
     [messageForResult]
   );
@@ -5617,12 +5634,17 @@ function SettingsSection(props) {
   pokeDraftRef.current = pokeDraft;
   const pokeTextTimerRef = React.useRef(null);
   const pokeTextPendingRef = React.useRef(null);
+  // M7-10 回归：记录本页最近一次落盘后的规范化数组签名。
+  // store 会把空串/重复项过滤掉；若不加签名判断，自身保存后的 settings 回写会把
+  // 用户刚点「添加文案」产生的空输入行覆盖掉（表现为点输入框后瞬间消失）。
+  const pokeSavedSignatureRef = React.useRef(null);
   React.useEffect(
     function () {
-      setPokeDraft({
-        userTexts: Array.isArray(settingsPoke.userTexts) ? settingsPoke.userTexts.slice() : [],
-        assistantTexts: Array.isArray(settingsPoke.assistantTexts) ? settingsPoke.assistantTexts.slice() : []
-      });
+      const incomingUser = Array.isArray(settingsPoke.userTexts) ? settingsPoke.userTexts.slice() : [];
+      const incomingAssistant = Array.isArray(settingsPoke.assistantTexts) ? settingsPoke.assistantTexts.slice() : [];
+      const signature = pokeDraftSignature(incomingUser, incomingAssistant);
+      if (!shouldSyncPokeDraft(pokeTextPendingRef.current, signature, pokeSavedSignatureRef.current)) return;
+      setPokeDraft({ userTexts: incomingUser, assistantTexts: incomingAssistant });
     },
     [settingsPoke.userTexts, settingsPoke.assistantTexts]
   );
@@ -5639,13 +5661,26 @@ function SettingsSection(props) {
       if (!pending) return;
       const userTexts = Array.isArray(pending.userTexts) ? pending.userTexts : [];
       const assistantTexts = Array.isArray(pending.assistantTexts) ? pending.assistantTexts : [];
+      // 与 store 的 sanitizePokeTexts 对齐，记录实际落盘数组的签名。
+      const savedUserTexts =
+        typeof sanitizePokeTexts === 'function' ? sanitizePokeTexts(userTexts, userTexts[0] || '') : userTexts;
+      const savedAssistantTexts =
+        typeof sanitizePokeTexts === 'function'
+          ? sanitizePokeTexts(assistantTexts, assistantTexts[0] || '')
+          : assistantTexts;
       // 同步旧单条字段，让 0.1.0 旧版插件仍能读到首条文案。
-      updatePoke({
+      const result = updatePoke({
         userTexts: userTexts,
         assistantTexts: assistantTexts,
         userText: userTexts[0] || '',
         assistantText: assistantTexts[0] || ''
       });
+      if (result && result.ok) {
+        pokeSavedSignatureRef.current = pokeDraftSignature(savedUserTexts, savedAssistantTexts);
+      } else {
+        // 保存失败（只读/配额/存储不可用）时保留待保存内容，避免下一次设置回写清空草稿。
+        pokeTextPendingRef.current = { userTexts: userTexts, assistantTexts: assistantTexts };
+      }
     },
     [updatePoke]
   );

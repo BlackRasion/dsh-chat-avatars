@@ -28,3 +28,30 @@ test('orphanWorkspaceIds：工作区列表未就绪/非法输入返回空，避�
   assert.deepEqual(orphanWorkspaceIds(true, null, []), []);
   assert.deepEqual(orphanWorkspaceIds(true, ['a'], 'not-an-array'), []);
 });
+
+// M7-10 回归：新增文案空行在防抖保存回写时不能被重置掉。
+const DRAFT_START = '// @chat-avatars-settings-poke-draft:start';
+const DRAFT_END = '// @chat-avatars-settings-poke-draft:end';
+const DRAFT_START_AT = SOURCE.indexOf(DRAFT_START);
+const DRAFT_END_AT = SOURCE.indexOf(DRAFT_END);
+assert.ok(DRAFT_START_AT >= 0 && DRAFT_END_AT > DRAFT_START_AT, 'src/80-settings.js 缺少拍一拍草稿标记');
+const DRAFT_BLOCK = SOURCE.slice(DRAFT_START_AT + DRAFT_START.length, DRAFT_END_AT);
+const draftApi = new Function(
+  "'use strict';\n" + DRAFT_BLOCK + '\nreturn { pokeDraftSignature, shouldSyncPokeDraft };'
+)();
+
+test('shouldSyncPokeDraft：本地未保存编辑不被 settings 回写覆盖', () => {
+  assert.equal(draftApi.shouldSyncPokeDraft({ userTexts: ['a', ''] }, '["a"]', '["a"]'), false);
+  assert.equal(draftApi.shouldSyncPokeDraft({ userTexts: ['a', ''] }, '["a"]', '["old"]'), false);
+  assert.equal(draftApi.shouldSyncPokeDraft(null, '["a"]', '["a"]'), false, '自身保存签名相同不回写');
+  assert.equal(draftApi.shouldSyncPokeDraft(null, '["a"]', '["old"]'), true, '外部变更需要回写');
+  assert.equal(draftApi.shouldSyncPokeDraft(undefined, '["a"]', null), true);
+});
+
+test('pokeDraftSignature：数组签名稳定，非数组安全归一为空数组', () => {
+  assert.equal(draftApi.pokeDraftSignature(['a', ''], ['b']), '[["a",""],["b"]]');
+  assert.equal(draftApi.pokeDraftSignature(['a'], []), draftApi.pokeDraftSignature(['a'], []));
+  assert.equal(draftApi.pokeDraftSignature(null, undefined), '[[],[]]');
+  assert.equal(draftApi.pokeDraftSignature(['a'], ['b']), '[["a"],["b"]]');
+  assert.notEqual(draftApi.pokeDraftSignature(['a'], []), draftApi.pokeDraftSignature([], ['a']));
+});
