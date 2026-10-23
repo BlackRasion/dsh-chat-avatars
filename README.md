@@ -12,7 +12,7 @@
 overrides, interactive cropping, click-to-change, animated GIF/APNG/WebP avatars (client-side
 sprite sheet + CSS `steps()`), a large preview, and a purely local "poke" effect. Zero runtime
 dependencies; data stays in `localStorage`. Install the GitHub Release tarball with
-`dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.1.tgz`.
+`dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.2.tgz`.
 Requires dsh `>=0.2.1-rc.2 <0.3.0`. MIT licensed.
 
 ## 界面
@@ -43,11 +43,11 @@ Requires dsh `>=0.2.1-rc.2 <0.3.0`. MIT licensed.
 
 ### 方式 1：GitHub Release tarball（当前推荐）
 
-1. 打开 [Releases](https://github.com/BlackRasion/dsh-chat-avatars/releases)，下载最新 `.tgz`（当前为 `dsh-chat-avatars-0.1.1.tgz`）。
+1. 打开 [Releases](https://github.com/BlackRasion/dsh-chat-avatars/releases)，下载最新 `.tgz`（当前为 `dsh-chat-avatars-0.1.2.tgz`）。
 2. 在终端执行（把路径和 profile 换成你的实际值）：
 
    ```bash
-   dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.1.tgz
+   dsh plugin --profile <profile> add /path/to/dsh-chat-avatars-0.1.2.tgz
    ```
 
    例如 dsh 的 Web profile 常用 `--profile web`。
